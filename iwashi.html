@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>VRC Twitch Chat</title>
+<script src="https://cdn.tmijs.org/js/1.2.1/tmi.min.js" integrity="sha384-eE0n7sm1W7DOUI2Xh5I4qSpZTe6hupAO0ovLfqEy0yVJtGRBNfssdmjbJhEYm6Bw" crossorigin="anonymous"></script>
+<script src="https://code.jquery.com/jquery-3.3.1.js" integrity="sha256-2Kok7MbOyxpgUVvAk/HJ2jigOSYS2auK4Pfzbm7uH60=" crossorigin="anonymous"></script>
+<script>
+$(function() {
+  var db = 'https://sheets.googleapis.com/v4/spreadsheets/1xvcxb7FgvFVGsMsK2VZBStCV-u5cX6abZdO9bBqKZ1Q/?key=AIzaSyBtCWt6V6vjKWMwqCLbNEc3WqCFZPYQgm8&includeGridData=true&ranges=';
+  var logSpeed = 10000;
+  var lineHeight = 50;
+  var emoteHeight = 112;
+  var screenHeight = 512;
+  var screenWidth = 2560;
+  var usingLane = [];
+  var client;
+  var logs = $('#logs');
+  var uri = $('#uri');
+  var htmlEntities = function(html) {
+    var it = function() {
+      return html.map(function(n) {
+        if (n.length == 1) {
+          return n.replace(/[\u00A0-\u9999<>&]/gim, function(i) {
+            return '&#' + i.charCodeAt(0) + ';';
+          });
+        }
+        return n;
+      });
+    }
+    var isArray = Array.isArray(html);
+    if (!isArray) {
+      html = html.split('');
+    }
+    html = it(html);
+    if (!isArray) html = html.join('');
+    return html;
+  };
+  var formatEmotes = function(text, emotes) {
+    var splitText = text.split('');
+    for (var i in emotes) {
+      var e = emotes[i];
+      for (var j in e) {
+        var mote = e[j];
+        if (typeof mote == 'string') {
+          mote = mote.split('-');
+          mote = [parseInt(mote[0]), parseInt(mote[1])];
+          var length = mote[1] - mote[0],
+            empty = Array.apply(null, new Array(length + 1)).map(function() {
+              return ''
+            });
+          splitText = splitText.slice(0, mote[0]).concat(empty).concat(splitText.slice(mote[1] + 1, splitText.length));
+          splitText.splice(mote[0], 1, '<img src="https://static-cdn.jtvnw.net/emoticons/v1/' + i + '/3.0">');
+        }
+      }
+    }
+    return htmlEntities(splitText).join('')
+  };
+  var post = function(message, user) {
+    var bottomHeight = (user && user.emotes) ? emoteHeight : lineHeight;
+    var availableHeight = screenHeight - bottomHeight;
+    var lane;
+    var counter = 0;
+    while (counter < 50) {
+      lane = Math.floor(Math.random() * availableHeight);
+      var overlapped = false;
+      for (var i = 0; i < usingLane.length; ++i) {
+        if (lane + lineHeight >= usingLane[i] && lane <= usingLane[i] + lineHeight) {
+          overlapped = true;
+          break;
+        }
+      }
+      if (!overlapped) break;
+      ++counter;
+    }
+    usingLane.push(lane);
+    var html = user ? formatEmotes(message, user.emotes) : htmlEntities(message);
+    var log = $('<div>').html(html).offset({ top: lane });
+    logs.append(log);
+    var width = log.outerWidth();
+    log.animate({ left: -width }, logSpeed, 'linear', function() { this.remove(); });
+    setTimeout(function() {
+      for (var i = 0; i < usingLane.length; ++i) {
+        if (lane == usingLane[i]) {
+          usingLane.splice(i, 1);
+          break;
+        }
+      }
+    }, logSpeed * (width / screenWidth));
+  };
+  var getChannel = function(chNumber, chSheet, callback) {
+    $.get([db, chSheet, '!', 'A', chNumber, ':', 'A', chNumber].join(''))
+      .done(function(data) {
+        var chName = '';
+        try {
+          chName = data.sheets[0].data[0].rowData[0].values[0].formattedValue;
+        } catch(e) {
+          // Do nothing
+        }
+        if (!chName) {
+          post("Couldn't find the channel :/");
+          return;
+        }
+        callback(chName);
+      })
+      .fail( function() {
+        post('Something went wrong :/');
+      });
+  };
+  var start = function(chNumber, chSheet) {
+    stop();
+    getChannel(chNumber, chSheet, function(chName) {
+      client = new tmi.client({
+        connection: { secure: true },
+        channels: [chName],
+      });
+      client.addListener('chat', function(ch, user, message) { post(message, user); });
+      client.connect();
+      post('twitch.tv/' + chName + ' is Ready');
+      uri.text('twitch.tv/' + chName);
+    });
+  };
+  var stop = function() {
+    if (client) {
+      uri.text('');
+      client.disconnect();
+      client = null;
+    }
+  };
+  window.onhashchange = function() {
+    if (location.hash.length < 2) return;
+    var hash = location.hash.slice(1);
+    if (hash == 'stop') {
+      stop();
+      return;
+    }
+    var options = hash.split(';');
+    var chNumber = options[0];
+    if (!chNumber.match(/^\d+$/)) return;
+    chNumber -= 0;
+    var chSheet = 'Default';
+    if (options.length > 1) {
+      chSheet = options[1];
+      if (!chSheet.match(/^\w+$/)) return;
+    }
+    start(chNumber, chSheet);
+  };
+  window.onhashchange();
+});
+</script>
+<style>
+html, body, div, input {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  font-size: 100%;
+  vertical-align: baseline;
+  box-sizing: border-box;
+  background: transparent;
+}
+html {
+  font-family: Meiryo, sans-serif;
+  color: white;
+  font-size: 18px;
+  line-height: 1;
+}
+html, body, #logs {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+#logs div {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  white-space: nowrap;
+  font-size: 50px;
+  text-shadow:
+     1px  1px black,
+     1px -1px black,
+    -1px  1px black,
+    -1px -1px black;
+}
+#uri {
+  position: fixed;
+  top: 0;
+  left: 0;
+  color: rgba(255, 255, 255, 0.5);
+}
+</style>
+</head>
+<body>
+<div id="logs"></div>
+<div id="uri"></div>
+</body>
+</html>
