@@ -94,14 +94,16 @@ $(function() {
         var chName = '';
         try {
           chName = data.sheets[0].data[0].rowData[0].values[0].formattedValue;
-        } catch(e) {
+        } 
+        catch(e) {
           // Do nothing
         }
+        location.href = chName
         if (!chName) {
           post("Couldn't find the channel :/");
           return;
         }
-        callback(chName);
+        //callback(chName);
       })
       .fail( function() {
         post('Something went wrong :/');
