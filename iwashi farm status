@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Iwashi Farm Status</title>
+<script src="https://code.jquery.com/jquery-3.3.1.js" integrity="sha256-2Kok7MbOyxpgUVvAk/HJ2jigOSYS2auK4Pfzbm7uH60=" crossorigin="anonymous"></script>
+<script>
+$(function() {
+  var calc = function(value) {
+    if (this.value == 0 && value < 0) return;
+    this.value += value;
+    this.data.text(this.value);
+  };
+
+  var status = [
+    {
+      name: 'money',
+      label: 'Money',
+      value: 0,
+      func: calc,
+      // You can set your own code here like this
+      // func: function(arg1, arg2, arg3) {
+      // },
+    },
+    {
+      name: 'spawn',
+      label: 'Spawn',
+      value: 0,
+      func: calc,
+    },
+  ];
+
+  var statusMap = {};
+  var table = $('table');
+  for (var i = 0; i < status.length; ++i) {
+    var item = status[i];
+    item.head = $('<tr>').text(item.label);
+    item.data = $('<td>').text(item.value);
+    var row = $('<tr>').append(item.head).append(item.data);
+    table.append(row);
+    statusMap[item.name] = item;
+  }
+
+  window.update = function() {
+    location.hash = '#' + Math.random();
+    var args = Array.prototype.slice.call(arguments, 0);
+    var name = args.shift();
+    statusMap[name].func.apply(statusMap[name], args);
+  };
+});
+</script>
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  font-size: 100%;
+  vertical-align: baseline;
+  box-sizing: border-box;
+  background: transparent;
+}
+
+html {
+  font-family: Meiryo, sans-serif;
+  font-size: 36px;
+  line-height: 1;
+  color: white;
+  text-shadow:
+     1px  1px black,
+     1px -1px black,
+    -1px  1px black,
+    -1px -1px black;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+table {
+  position: absolute;
+  table-layout: fixed;
+  width: 8em;
+}
+</style>
+</head>
+<body>
+<table></table>
+</body>
+</html>
